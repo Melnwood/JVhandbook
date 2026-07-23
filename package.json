@@ -1,0 +1,7 @@
+{
+  "name": "jv-handbook-system",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Josiah Venture country handbook register and builder"
+}
