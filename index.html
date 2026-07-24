@@ -63,20 +63,14 @@ h1{font-family:Fraunces,Georgia,serif;font-weight:600;font-size:clamp(34px,6vw,5
 <div class="cards" id="cards"></div>
 </div>
 <script>
-const CNAT={Albania:"Shqipëria",Bulgaria:"България",Croatia:"Hrvatska","Czech Republic":"Česká republika",
- Estonia:"Eesti",Germany:"Deutschland",Hungary:"Magyarország",Latvia:"Latvija",Moldova:"Moldova",
- Montenegro:"Crna Gora",Poland:"Polska",Romania:"România",Serbia:"Србија",Slovakia:"Slovensko",
- Slovenia:"Slovenija",Ukraine:"Україна"};
-const FLAG={Albania:"🇦🇱",Bulgaria:"🇧🇬",Croatia:"🇭🇷","Czech Republic":"🇨🇿",Estonia:"🇪🇪",Germany:"🇩🇪",
- Hungary:"🇭🇺",Latvia:"🇱🇻",Moldova:"🇲🇩",Montenegro:"🇲🇪",Poland:"🇵🇱",Romania:"🇷🇴",Serbia:"🇷🇸",
- Slovakia:"🇸🇰",Slovenia:"🇸🇮",Ukraine:"🇺🇦"};
-const FALLBACK=Object.keys(CNAT).map(c=>({country:c,org:"",ctl:"",status:"",nextReview:""}));
+const FLAG={Albania:"🇦🇱",Bulgaria:"🇧🇬",Canada:"🇨🇦",Croatia:"🇭🇷","Czech Republic":"🇨🇿",Estonia:"🇪🇪",
+ Germany:"🇩🇪",Hungary:"🇭🇺",Latvia:"🇱🇻",Moldova:"🇲🇩",Montenegro:"🇲🇪",Poland:"🇵🇱",Romania:"🇷🇴",
+ Serbia:"🇷🇸",Slovakia:"🇸🇰",Slovenia:"🇸🇮",Ukraine:"🇺🇦","United Kingdom":"🇬🇧"};
+// Full roster always shows; live records (when present) are merged in by name.
+const ROSTER=Object.keys(FLAG).sort((a,b)=>a.localeCompare(b));
+function merge(live){const m={};(live||[]).forEach(c=>{m[c.country]=c;});
+ return ROSTER.map(n=>m[n]||{country:n,total:0,done:0});}
 const esc=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-function scls(status){const s=(status||"").toLowerCase();
- if(/review|progress|draft|adopt/.test(s))return"review";
- if(/publish|live|current|complete|done/.test(s))return"live";
- return"none";}
-function fmtDate(d){if(!d)return"";const t=new Date(d);return isNaN(t)?"":t.toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"});}
 function card(c){
  const total=c.total||0,done=c.done||0,toGo=Math.max(0,total-done);
  const set=total>0,full=set&&done>=total;
@@ -92,15 +86,15 @@ function card(c){
  </a>`;
 }
 function draw(list){document.getElementById("cards").innerHTML=list.map(card).join("");
- document.getElementById("count").textContent=list.length+" national organizations";}
-draw(FALLBACK);
+ document.getElementById("count").textContent=list.length+" countries";}
+draw(merge(null));
 (async()=>{
  const msg=document.getElementById("msg");
  try{
   const res=await fetch("/api?action=countries");
   const j=await res.json();
   if(!res.ok||j.error)throw new Error(j.error||("HTTP "+res.status));
-  if(Array.isArray(j.countries)&&j.countries.length){draw(j.countries);msg.textContent="Live status from Airtable.";}
+  if(Array.isArray(j.countries)){draw(merge(j.countries));msg.textContent="Live status from Airtable.";}
  }catch(e){ msg.textContent="Showing the standard roster — live status loads once the site is deployed with AIRTABLE_TOKEN set."; }
 })();
 </script></body></html>
