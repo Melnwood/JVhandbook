@@ -87,18 +87,35 @@ export const handler = async (event) => {
 
     // ---- READ: all countries (for the landing page) -----------------------
     if (event.httpMethod === 'GET' && action === 'countries') {
-      const recs = await listAll(TBL.countries);
+      // Countries + every junction record, so we can show per-country progress.
+      const [recs, cs] = await Promise.all([
+        listAll(TBL.countries),
+        listAll(TBL.countrySections),
+      ]);
+      const nameById = {};
+      for (const r of recs) nameById[r.id] = r.fields['Country'];
+      const prog = {}; // country name -> { done, total }
+      for (const r of cs) {
+        const link = r.fields['Country'];
+        const nm = link && link[0] && nameById[link[0]];
+        if (!nm) continue;
+        const p = prog[nm] || (prog[nm] = { done: 0, total: 0 });
+        p.total += 1;
+        if ((r.fields['Local Text'] || '').trim()) p.done += 1;
+      }
       return json(200, {
         countries: recs
-          .map((r) => ({
-            country: r.fields['Country'] || '',
-            org: r.fields['National Organization'] || '',
-            ctl: r.fields['Country Team Leader'] || '',
-            status: r.fields['Status'] || '',
-            handbookVersion: r.fields['Handbook Version'] || '',
-            nextReview: r.fields['Next Review Due'] || '',
-            language: r.fields['Language of Publication'] || '',
-          }))
+          .map((r) => {
+            const nm = r.fields['Country'] || '';
+            const p = prog[nm] || { done: 0, total: 0 };
+            return {
+              country: nm,
+              org: r.fields['National Organization'] || '',
+              status: r.fields['Status'] || '',
+              done: p.done,
+              total: p.total,
+            };
+          })
           .filter((c) => c.country)
           .sort((a, b) => a.country.localeCompare(b.country)),
       });
