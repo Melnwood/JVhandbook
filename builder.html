@@ -103,6 +103,11 @@ textarea:focus{outline:2px solid var(--focus);outline-offset:-1px}
 .langtog .lt{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.04em;padding:6px 15px;border:0;background:none;color:var(--soft);cursor:pointer}
 .langtog .lt.on{background:var(--ink);color:#fff}
 .langtog .lt:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+/* --- Airtable sync --- */
+.syncmsg:empty{display:none}
+.syncmsg{font-size:13px;line-height:1.5;margin:-4px 0 14px;padding:10px 13px;border-radius:var(--r);background:var(--s2);border:1px solid var(--rule)}
+.syncmsg.ok{background:#EAF4F0;border-color:#BFE0D6;color:#14493E}
+.syncmsg.err{background:#F7E9EC;border-color:#E3B7C0;color:#6E1D2B}
 @media(max-width:640px){.ino{min-width:48px}.ch{gap:6px}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style></head><body><div class="wrap">
@@ -142,7 +147,10 @@ textarea:focus{outline:2px solid var(--focus);outline-offset:-1px}
   <button class="btn" data-f="todo" id="fTodo">Still to write</button>
   <button class="btn" data-f="dep" data-i18n="departures">Departures</button>
   <button class="btn" id="exp" data-i18n="exportData">Export data</button>
+  <button class="btn" id="load" data-i18n="loadAirtable">☁ Load from Airtable</button>
+  <button class="btn solid" id="save" data-i18n="saveAirtable">☁ Save to Airtable</button>
  </div>
+ <div class="syncmsg" id="syncmsg"></div>
  <div id="build"></div>
 </div>
 <p class="foot" data-i18n-html="foot">Sections always assemble in handbook order regardless of the order you tick them.
@@ -182,6 +190,55 @@ function loadBrand(){try{const v=localStorage.getItem(BSK);if(v)brand=JSON.parse
 function syncBrand(){const b=bd();
  document.getElementById("brandcol").value=b.color||"#1B7565";
  document.getElementById("logoprev").innerHTML=b.logo?`<img src="${b.logo}" alt="Logo preview">`:"";}
+// --- Airtable sync: EXPLICIT only. Never autosaves, never writes blank over existing. ---
+let remote={}; // country -> { no: {id, localText} } | null (fetch failed)
+function syncMsg(html,cls){const el=document.getElementById("syncmsg");if(!el)return;el.className="syncmsg"+(cls?" "+cls:"");el.innerHTML=html;}
+// The country's authored local text for a section: native (.loc) preferred, else a real English edit.
+function localOf(no){const r=st()[no],loc=(r.loc||"").trim();if(loc)return r.loc;
+ const s=SEC.find(x=>x.no===no);return (s&&r.txt.trim()!==s.text.trim())?r.txt:"";}
+function updateSyncButtons(){const m=remote[country],has=!!(m&&Object.keys(m).length);
+ const sv=document.getElementById("save"),ld=document.getElementById("load");
+ [sv,ld].forEach(b=>{if(b){b.disabled=!has;b.style.opacity=has?"":"0.45";}});}
+async function loadRemote(){
+ const c=country;
+ try{
+  const res=await fetch("/api?action=country&name="+encodeURIComponent(c));
+  const j=await res.json();
+  if(!res.ok||j.error)throw new Error(j.error||("HTTP "+res.status));
+  const map={};(j.records||[]).forEach(r=>{if(r.no)map[r.no]={id:r.id,localText:r.localText||""};});
+  remote[c]=map;const n=Object.keys(map).length;updateSyncButtons();
+  if(n)syncMsg("Connected to Airtable — "+n+" section records for <b>"+esc(c)+"</b>.","ok");
+  else syncMsg("Airtable has no records for <b>"+esc(c)+"</b> yet — saving is disabled until International Resources sets this country up.","");
+ }catch(e){remote[c]=null;updateSyncButtons();
+  syncMsg("Not connected to Airtable ("+esc(String(e.message||e))+"). Works once deployed with <code>AIRTABLE_TOKEN</code> set.","err");}
+}
+async function saveToAirtable(){
+ const m=remote[country];if(!m){syncMsg("Load the country from Airtable first.","err");return;}
+ const c=st();
+ const authored=ORDER.filter(s=>c[s.no].on).map(s=>s.no).filter(no=>m[no]).map(no=>({no,text:localOf(no)})).filter(x=>x.text.trim());
+ if(!authored.length){syncMsg("Nothing to save yet — write some local text first (blank/unchanged sections are skipped, so nothing gets overwritten).","");return;}
+ const records=authored.filter(x=>x.text!==(m[x.no].localText||"")).map(x=>({id:m[x.no].id,fields:{"fldWQiLyTXMTi0ona":x.text}}));
+ if(!records.length){syncMsg("Already up to date — no changes to save.","ok");return;}
+ document.getElementById("save").disabled=true;
+ syncMsg("Saving "+records.length+" section"+(records.length>1?"s":"")+" to Airtable…","");
+ try{
+  const res=await fetch("/api?action=save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({records})});
+  const j=await res.json();
+  if(!res.ok||j.error)throw new Error(j.error||("HTTP "+res.status));
+  records.forEach(r=>{const no=Object.keys(m).find(k=>m[k].id===r.id);if(no)m[no].localText=r.fields["fldWQiLyTXMTi0ona"];});
+  syncMsg("Saved <b>"+(j.saved!=null?j.saved:records.length)+"</b> section"+((j.saved||records.length)>1?"s":"")+" to Airtable.","ok");
+ }catch(e){syncMsg("Save failed: "+esc(String(e.message||e)),"err");}
+ finally{updateSyncButtons();}
+}
+function loadFromAirtable(){
+ const m=remote[country];if(!m){syncMsg("Not connected to Airtable.","err");return;}
+ const entries=Object.entries(m).filter(([,r])=>(r.localText||"").trim());
+ if(!entries.length){syncMsg("Airtable has no saved local text for <b>"+esc(country)+"</b> yet.","");return;}
+ if(!confirm("Load "+entries.length+" saved section(s) from Airtable into "+langEndo()+"? This overwrites your current local-language text for those sections in this browser tab."))return;
+ entries.forEach(([no,r])=>{if(st()[no])st()[no].loc=r.localText;});
+ persist();draw();
+ syncMsg("Loaded "+entries.length+" section"+(entries.length>1?"s":"")+" from Airtable into the "+esc(langEndo())+" text.","ok");
+}
 
 // Publication language per country. "en" is the JV master language; "loc" is the country's own.
 const LANG={Albania:{code:"sq",name:"Albanian",endo:"Shqip"},Bulgaria:{code:"bg",name:"Bulgarian",endo:"Български"},
@@ -221,7 +278,7 @@ const I18N={
   handbookLang:"Handbook language",warnbar:"<b>Prototype.</b> Your section choices and edits now save in this browser, so they survive a refresh — but they are not yet written to the shared Airtable base. Use Export to hand your work off.",
   tabChoose:"Choose sections",tabBuild:"Build handbook",selectAll:"Select all",clearAll:"Clear all",
   standardSet:"Standard set (everything but the US annex)",allChosen:"All chosen",departures:"Departures",
-  exportData:"Export data",downloadPDF:"Download PDF",branding:"Branding",logo:"Logo",brandColor:"Brand color",
+  exportData:"Export data",saveAirtable:"☁ Save to Airtable",loadAirtable:"☁ Load from Airtable",downloadPDF:"Download PDF",branding:"Branding",logo:"Logo",brandColor:"Brand color",
   foot:"Sections always assemble in handbook order regardless of the order you tick them. Every section is editable, whatever its classification — but editing a <b>Universal</b> section is recorded as a departure, because those are meant to read identically in all 16 countries. Departures are for HR to see, not for the system to block.",
   sectionsChosen:"Sections chosen",inHandbook:"In this handbook",stillToWrite:"Still to write",stillToTranslate:"Still to translate",
   toWrite:"to write",toTranslate:"to translate",all:"All",none:"None",handbook:"handbook",ready:"ready",inWord:"in",
@@ -237,7 +294,7 @@ const I18N={
   handbookLang:"Jazyk příručky",warnbar:"<b>Prototyp.</b> Vaše volby a úpravy se ukládají v tomto prohlížeči, takže přežijí obnovení stránky — zatím se však nezapisují do sdílené databáze Airtable. Použijte Export k předání práce.",
   tabChoose:"Vybrat oddíly",tabBuild:"Sestavit příručku",selectAll:"Vybrat vše",clearAll:"Zrušit vše",
   standardSet:"Standardní sada (vše kromě přílohy USA)",allChosen:"Vše vybrané",departures:"Odchylky",
-  exportData:"Exportovat data",downloadPDF:"Stáhnout PDF",branding:"Značka",logo:"Logo",brandColor:"Barva značky",
+  exportData:"Exportovat data",saveAirtable:"☁ Uložit do Airtable",loadAirtable:"☁ Načíst z Airtable",downloadPDF:"Stáhnout PDF",branding:"Značka",logo:"Logo",brandColor:"Barva značky",
   foot:"Oddíly se vždy poskládají v pořadí příručky bez ohledu na to, v jakém pořadí je zaškrtnete. Každý oddíl lze upravit bez ohledu na klasifikaci — úprava <b>univerzálního</b> oddílu se však zaznamená jako odchylka, protože ty mají znít shodně ve všech 16 zemích. Odchylky jsou pro HR, systém je neblokuje.",
   sectionsChosen:"Vybrané oddíly",inHandbook:"V této příručce",stillToWrite:"Zbývá napsat",stillToTranslate:"Zbývá přeložit",
   toWrite:"k napsání",toTranslate:"k překladu",all:"Vše",none:"Nic",handbook:"příručka",ready:"hotovo",inWord:"v jazyce",
@@ -454,7 +511,9 @@ function makePDF(){
 function draw(){applyStaticLabels();drawLangTog();dashboard();tiles();drawPick();drawBuild();persist();}
 
 document.getElementById("co").innerHTML=COUNTRIES.map(c=>`<option${c===country?" selected":""}>${c}</option>`).join("");
-document.getElementById("co").onchange=e=>{country=e.target.value;draw();syncBrand();};
+document.getElementById("co").onchange=e=>{country=e.target.value;draw();syncBrand();loadRemote();};
+document.getElementById("save").onclick=saveToAirtable;
+document.getElementById("load").onclick=loadFromAirtable;
 document.getElementById("logo").addEventListener("change",e=>{
  const f=e.target.files&&e.target.files[0];if(!f)return;
  const r=new FileReader();
@@ -518,5 +577,5 @@ document.getElementById("exp").onclick=()=>{
  const w=window.open("","_blank");
  w.document.write("<title>Export — "+country+"</title><pre style='white-space:pre-wrap;font:12px/1.5 monospace;padding:20px'>"+
   esc(JSON.stringify({country,generated:new Date().toISOString(),sections:out},null,2))+"</pre>");};
-load();loadBrand();draw();syncBrand();
+load();loadBrand();draw();syncBrand();updateSyncButtons();loadRemote();
 </script></body></html>

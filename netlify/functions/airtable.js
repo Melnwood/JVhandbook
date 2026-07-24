@@ -93,19 +93,30 @@ export const handler = async (event) => {
       }
       // Escape quotes before interpolating into the Airtable formula.
       const safe = name.replace(/'/g, "\\'");
-      const recs = await listAll(TBL.countrySections, {
-        filterByFormula: `FIND('${safe}', ARRAYJOIN({Country}))`,
-      });
+      // Fetch the country's junction records and the master sections in parallel,
+      // so we can resolve each record's Section link (a record id) to its number.
+      const [secs, recs] = await Promise.all([
+        listAll(TBL.sections),
+        listAll(TBL.countrySections, {
+          filterByFormula: `FIND('${safe}', ARRAYJOIN({Country}))`,
+        }),
+      ]);
+      const numById = {};
+      for (const s of secs) numById[s.id] = s.fields['Section Number'];
       return json(200, {
         country: name,
-        records: recs.map((r) => ({
-          id: r.id,
-          key: r.fields['Key'],
-          localText: r.fields['Local Text'] || '',
-          status: r.fields['Status'],
-          disposition: r.fields['Disposition'],
-          notes: r.fields['Response Notes'] || '',
-        })),
+        records: recs.map((r) => {
+          const link = r.fields['Section'];
+          return {
+            id: r.id,
+            no: (link && link[0] && numById[link[0]]) || null,
+            key: r.fields['Key'],
+            localText: r.fields['Local Text'] || '',
+            status: r.fields['Status'],
+            disposition: r.fields['Disposition'],
+            notes: r.fields['Response Notes'] || '',
+          };
+        }),
       });
     }
 
