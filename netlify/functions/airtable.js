@@ -85,6 +85,25 @@ export const handler = async (event) => {
       });
     }
 
+    // ---- READ: all countries (for the landing page) -----------------------
+    if (event.httpMethod === 'GET' && action === 'countries') {
+      const recs = await listAll(TBL.countries);
+      return json(200, {
+        countries: recs
+          .map((r) => ({
+            country: r.fields['Country'] || '',
+            org: r.fields['National Organization'] || '',
+            ctl: r.fields['Country Team Leader'] || '',
+            status: r.fields['Status'] || '',
+            handbookVersion: r.fields['Handbook Version'] || '',
+            nextReview: r.fields['Next Review Due'] || '',
+            language: r.fields['Language of Publication'] || '',
+          }))
+          .filter((c) => c.country)
+          .sort((a, b) => a.country.localeCompare(b.country)),
+      });
+    }
+
     // ---- READ: one country's section records ------------------------------
     if (event.httpMethod === 'GET' && action === 'country') {
       const name = (event.queryStringParameters || {}).name || '';

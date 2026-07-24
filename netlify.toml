@@ -5,6 +5,17 @@
 [functions]
   node_bundler = "esbuild"
 
+# The landing page — all countries
+[[redirects]]
+  from = "/"
+  to = "/countries.html"
+  status = 200
+
+[[redirects]]
+  from = "/countries"
+  to = "/countries.html"
+  status = 200
+
 # Short, friendly paths for the two pages
 [[redirects]]
   from = "/register"

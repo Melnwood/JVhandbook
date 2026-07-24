@@ -1,0 +1,92 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Country Handbooks — Josiah Venture</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='13' fill='%239E2B3F'/%3E%3Ctext x='32' y='45' font-family='Georgia,serif' font-size='34' font-weight='700' fill='%23fff' text-anchor='middle'%3EJV%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#E6E9EF;--surface:#FAFBFC;--s2:#F1F3F7;--ink:#161922;--soft:#5D6478;--faint:#8C93A6;--rule:#CDD3E0;
+--u:#9E2B3F;--t:#B87514;--n:#1B7565;--x:#7E8494;--flag:#FBF3E2;--focus:#2B4ACB;--r:3px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font-family:Archivo,system-ui,sans-serif;font-size:15px;line-height:1.5;padding-bottom:70px}
+.wrap{max-width:1100px;margin:0 auto;padding:0 24px}
+.mast{border-bottom:2px solid var(--ink);padding:30px 0 18px;margin-bottom:22px}
+.eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--soft);margin-bottom:9px}
+h1{font-size:clamp(27px,4.5vw,40px);font-weight:700;letter-spacing:-.025em;line-height:1.04}
+.sub{margin-top:10px;color:var(--soft);max-width:70ch;font-size:14.5px}
+.links{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap}
+.link{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.05em;border:1px solid var(--rule);border-radius:99px;padding:6px 13px;color:var(--soft);text-decoration:none}
+.link:hover{border-color:var(--ink);color:var(--ink)}
+.msg{font-size:13px;color:var(--soft);margin-bottom:16px;min-height:18px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.ccard{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--rule);border-left:3px solid var(--x);border-radius:var(--r);padding:16px 17px;text-decoration:none;color:inherit;transition:border-color .15s,box-shadow .15s}
+.ccard:hover{border-color:var(--ink);box-shadow:0 1px 8px rgba(0,0,0,.07)}
+.ccard:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.ccard.s-review{border-left-color:var(--t)}
+.ccard.s-live{border-left-color:var(--n)}
+.ccard.s-none{border-left-color:var(--x)}
+.cname{font-size:18px;font-weight:700;letter-spacing:-.015em;line-height:1.15}
+.cnative{font-size:13px;color:var(--soft);margin-top:1px}
+.corg{font-family:'IBM Plex Mono',monospace;font-size:11.5px;letter-spacing:.03em;color:var(--soft);margin-top:10px}
+.badge{align-self:flex-start;font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;padding:3px 8px;border-radius:99px;margin-top:11px;background:var(--s2);color:var(--soft)}
+.badge.s-review{background:#FAEFDA;color:#8A570F}
+.badge.s-live{background:#DFEDEA;color:#145A4E}
+.meta{font-size:12.5px;color:var(--faint);margin-top:9px;line-height:1.5}
+.go{margin-top:13px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:600;color:var(--u)}
+.ccard:hover .go{text-decoration:underline}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style></head><body><div class="wrap">
+<header class="mast">
+<div class="eyebrow">Josiah Venture · Staff Handbook System</div>
+<h1>Country handbooks</h1>
+<p class="sub">Each national organization builds its own staff handbook from the shared 104-section master. Pick a country to open its builder.</p>
+<div class="links">
+ <a class="link" href="/register">Oversight register →</a>
+</div>
+</header>
+<div class="msg" id="msg"></div>
+<div class="cards" id="cards"></div>
+</div>
+<script>
+// Native country names + fallback roster (works even before the API answers).
+const CNAT={Albania:"Shqipëria",Bulgaria:"България",Croatia:"Hrvatska","Czech Republic":"Česká republika",
+ Estonia:"Eesti",Germany:"Deutschland",Hungary:"Magyarország",Latvia:"Latvija",Moldova:"Moldova",
+ Montenegro:"Crna Gora",Poland:"Polska",Romania:"România",Serbia:"Србија",Slovakia:"Slovensko",
+ Slovenia:"Slovenija",Ukraine:"Україна"};
+const FALLBACK=Object.keys(CNAT).map(c=>({country:c,org:"",ctl:"",status:"",nextReview:""}));
+const esc=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+// Map an Airtable Status to a coarse visual class.
+function scls(status){const s=(status||"").toLowerCase();
+ if(/review|progress|draft|adopt/.test(s))return"review";
+ if(/publish|live|current|complete|done/.test(s))return"live";
+ return"none";}
+function fmtDate(d){if(!d)return"";const t=new Date(d);return isNaN(t)?"":t.toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"});}
+function card(c){
+ const cls=scls(c.status),native=CNAT[c.country]||"";
+ const meta=[c.ctl?("CTL: "+esc(c.ctl)):"",c.nextReview?("Review due "+esc(fmtDate(c.nextReview))):""].filter(Boolean).join(" · ");
+ return `<a class="ccard s-${cls}" href="/build?country=${encodeURIComponent(c.country)}">
+  <div class="cname">${esc(c.country)}</div>
+  ${native?`<div class="cnative">${esc(native)}</div>`:""}
+  ${c.org?`<div class="corg">${esc(c.org)}</div>`:""}
+  ${c.status?`<span class="badge s-${cls}">${esc(c.status)}</span>`:`<span class="badge">Not set up</span>`}
+  ${meta?`<div class="meta">${meta}</div>`:""}
+  <div class="go">Open builder →</div>
+ </a>`;
+}
+function draw(list){document.getElementById("cards").innerHTML=list.map(card).join("");}
+draw(FALLBACK);
+(async()=>{
+ const msg=document.getElementById("msg");
+ try{
+  const res=await fetch("/api?action=countries");
+  const j=await res.json();
+  if(!res.ok||j.error)throw new Error(j.error||("HTTP "+res.status));
+  if(Array.isArray(j.countries)&&j.countries.length){
+   draw(j.countries);
+   msg.textContent=j.countries.length+" national organizations · live from Airtable";
+  }
+ }catch(e){
+  msg.textContent="Showing the standard roster. Live status loads once the site is deployed with AIRTABLE_TOKEN set.";
+ }
+})();
+</script></body></html>

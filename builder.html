@@ -250,6 +250,8 @@ const LANG={Albania:{code:"sq",name:"Albanian",endo:"Shqip"},Bulgaria:{code:"bg"
  Serbia:{code:"sr",name:"Serbian",endo:"Српски"},Slovakia:{code:"sk",name:"Slovak",endo:"Slovenčina"},
  Slovenia:{code:"sl",name:"Slovenian",endo:"Slovenščina"},Ukraine:{code:"uk",name:"Ukrainian",endo:"Українська"}};
 let country=COUNTRIES[3], state={}, filter="all", lang="en";
+// Preselect a country when opened from the landing page (/build?country=Poland).
+try{const qp=new URLSearchParams(location.search).get("country");if(qp&&COUNTRIES.includes(qp))country=qp;}catch(e){}
 function st(){ if(!state[country]){state[country]={};
   ORDER.forEach(s=>state[country][s.no]={on:s.tier!==0,txt:s.text,loc:""});} return state[country]; }
 function langName(){const L=LANG[country];return L?L.name:"the local language";}
