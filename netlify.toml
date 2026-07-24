@@ -22,6 +22,12 @@
   to = "/.netlify/functions/airtable"
   status = 200
 
+# The AI proxy (drafting + translation)
+[[redirects]]
+  from = "/ai"
+  to = "/.netlify/functions/ai"
+  status = 200
+
 [[headers]]
   for = "/*"
   [headers.values]

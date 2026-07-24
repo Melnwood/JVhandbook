@@ -44,6 +44,18 @@ AIRTABLE_TOKEN = pat...
 
 Redeploy so the function picks it up.
 
+## 3b. Add the Anthropic key (for AI drafting + translation)
+
+The builder's **✨ Draft with AI** and **✨ Translate with AI** buttons call `/ai`, a serverless function that talks to Claude (`claude-opus-4-8`). The key stays server-side.
+
+Anthropic Console → **API keys** → create a key, then in Netlify → **Environment variables**:
+
+```
+ANTHROPIC_API_KEY = sk-ant-...
+```
+
+Redeploy. Until this is set, the AI buttons show a friendly "couldn't reach the AI" message and everything else keeps working. There's a small per-use cost; AI output is always inserted into an editable box for a human to review before it enters the handbook.
+
 ## 4. Check it works
 
 ```
@@ -61,6 +73,7 @@ Should return 104 sections. If it returns `AIRTABLE_TOKEN is not set`, the varia
 | `GET /api?action=sections` | All master sections: number, title, chapter, classification, master text |
 | `GET /api?action=country&name=Czech%20Republic` | That country's section records: local text, status, disposition |
 | `POST /api?action=save` | Saves country edits. Body: `{"records":[{"id":"rec…","fields":{"fldWQiLyTXMTi0ona":"…"}}]}` |
+| `POST /ai` | Claude drafting/translation. Body: `{"task":"draft"|"translate","no","title","classification","country","org","language","source"}` → `{"text":"…"}`. Not a general proxy — only these two tasks, prompt built server-side, source length capped. |
 
 The function is **not** a general passthrough. It permits three operations against fixed tables, and writes are restricted to a four-field whitelist (Local Text, Status, Disposition, Response Notes). Master text and classification cannot be written from the browser. Keep it that way — a general proxy would let anyone with the site URL rewrite the base.
 
