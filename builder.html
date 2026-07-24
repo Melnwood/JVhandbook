@@ -70,6 +70,9 @@ textarea:focus{outline:2px solid var(--focus);outline-offset:-1px}
 .ghint{padding:9px 16px;font-size:12.5px;color:#7A5410;background:var(--flag);border-bottom:1px solid var(--rule);line-height:1.5}
 .pickblk>summary{cursor:pointer;list-style:none}
 .pickblk>summary::-webkit-details-marker{display:none}
+.pickblk>summary{position:relative;padding-right:36px}
+.pickblk>summary::after{content:"\203A";position:absolute;right:16px;top:50%;transform:translateY(-50%) rotate(90deg);transition:transform .15s;color:var(--faint);font-size:17px}
+.pickblk[open]>summary::after{transform:translateY(-50%) rotate(270deg)}
 .cx{margin-left:auto;border-color:transparent;color:var(--soft);font-size:11px;padding:4px 9px}
 .cx:hover{border-color:var(--u);color:var(--u)}
 .needs{margin-top:9px;background:#F7E9EC;border:1px solid #E3B7C0;border-left:3px solid var(--u);border-radius:0 var(--r) var(--r) 0;padding:9px 12px;font-size:12.5px;color:#6E1D2B;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
@@ -417,8 +420,8 @@ function drawPick(){
  const onC=a=>a.filter(s=>c[s.no].on).length;
  const block=(open,icon,head,desc,arr)=>`<details class="grp pickblk"${open?" open":""}><summary class="gh"><span class="gt">${icon} ${esc(head)}</span><span class="gt">${onC(arr)}/${arr.length}</span></summary><div class="ghint">${desc}</div>${arr.map(row).join("")}</details>`;
  document.getElementById("groups").innerHTML=
-  block(true,"✍","Your organization writes these — start here","Your handbook's own story and local details — name and history, mission, leadership, holidays, salary. In <b>Build handbook</b>, use <b>✨ Draft with AI</b> for a starting point.",g.local)+
-  block(true,"✓","Core — should be in every handbook","These are the core things that should carry across every JV handbook. They're pre-selected — but uncheck any that truly don't fit your country.",g.core)+
+  block(false,"✍","Your organization writes these — start here","Your handbook's own story and local details — name and history, mission, leadership, holidays, salary. In <b>Build handbook</b>, use <b>✨ Draft with AI</b> for a starting point.",g.local)+
+  block(false,"✓","Core — should be in every handbook","These are the core things that should carry across every JV handbook. They're pre-selected — but uncheck any that truly don't fit your country.",g.core)+
   block(false,"◆","Worth thinking about","JV sets the wording and you fill in the local specifics. Consider each one for your country.",g.recommended)+
   block(false,"＋","Also consider","Add these if they fit your country.",g.optional);
 }
