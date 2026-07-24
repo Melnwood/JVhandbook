@@ -63,6 +63,11 @@ textarea:focus{outline:2px solid var(--focus);outline-offset:-1px}
 .dot.ok{background:var(--n)}.dot.todo{background:var(--t)}.dot.dep{background:var(--u)}
 .dep{background:#F7E9EC;border-left:3px solid var(--u);padding:10px 13px;margin-top:9px;font-size:13px;color:#6E1D2B;border-radius:0 var(--r) var(--r) 0;line-height:1.5}
 .empty{background:var(--surface);border:1px dashed var(--rule);border-radius:var(--r);padding:44px;text-align:center;color:var(--soft)}
+.it.lk{cursor:default}
+.it.lk input{cursor:not-allowed;accent-color:var(--n)}
+.coreblk>summary{cursor:pointer;list-style:none}
+.coreblk>summary::-webkit-details-marker{display:none}
+.ghint{padding:9px 16px;font-size:12.5px;color:#7A5410;background:var(--flag);border-bottom:1px solid var(--rule);line-height:1.5}
 .hide{display:none}
 .foot{margin-top:30px;padding-top:15px;border-top:1px solid var(--rule);font-size:12.5px;color:var(--soft);line-height:1.6;max-width:76ch}
 .foot code{font-family:'IBM Plex Mono',monospace;font-size:11.5px;background:var(--s2);padding:1px 5px;border-radius:2px}
@@ -127,9 +132,8 @@ textarea:focus{outline:2px solid var(--focus);outline-offset:-1px}
 <div id="p1" role="tabpanel">
  <div class="tiles" id="tiles1"></div>
  <div class="bar">
-  <button class="btn solid" data-a="all" data-i18n="selectAll">Select all</button>
-  <button class="btn" data-a="none" data-i18n="clearAll">Clear all</button>
-  <button class="btn" data-a="std" data-i18n="standardSet">Standard set (everything but the US annex)</button>
+  <button class="btn" data-a="all">Turn on all optional</button>
+  <button class="btn" data-a="none">Turn off all optional</button>
  </div>
  <div id="groups"></div>
 </div>
@@ -166,13 +170,24 @@ function skey(no){
  const p=no.split(".");
  return [parseInt(p[0]),p.length>1?parseInt(p[1]):0,p.length>2?p[2]:""];
 }
+const EXTRA=[
+ {no:"0.1",title:"Your Organization — Name & Meaning",chap:"0",tier:3,status:"Current",note:"",text:"[LOCAL: the meaning of your organization's name, its legal registered name, and the story behind it.]"},
+ {no:"0.2",title:"Your Organization — History & Founding",chap:"0",tier:3,status:"Current",note:"",text:"[LOCAL: when and how your national organization began — founding team, key milestones, how the work grew, and when it became a registered organization.]"},
+ {no:"0.3",title:"Your Organization — Mission & Vision",chap:"0",tier:3,status:"Current",note:"",text:"[LOCAL: your organization's own mission and vision for your country, and the values that shape how you work.]"},
+ {no:"0.4",title:"Your Organization — Leadership, Offices & Contacts",chap:"0",tier:3,status:"Current",note:"",text:"[LOCAL: your governance and legal structure, board, leadership team, offices and locations, and key contacts.]"}
+];
+SEC.push(...EXTRA);
 const ORDER=[...SEC].sort((a,b)=>{const x=skey(a.no),y=skey(b.no);
  return x[0]-y[0]||x[1]-y[1]||x[2].localeCompare(y[2]);});
 const CHAPS=[...new Set(ORDER.map(s=>s.chap))];
-const CHNAME={"1":"Chapter 1 — Overview","2":"Chapter 2 — Employment Standards","3":"Chapter 3 — Support Services",
+const CHNAME={"0":"Your Organization","1":"Chapter 1 — Overview","2":"Chapter 2 — Employment Standards","3":"Chapter 3 — Support Services",
 "4":"Chapter 4 — Salary Administration","5":"Chapter 5 — Expenses","6":"Chapter 6 — Ministry Partner Development",
 "7":"Chapter 7 — Communications","8":"Chapter 8 — Emergency","App":"Appendices","Annex":"US Annex"};
 const MARK=/\[LOCAL|\[NEW SECTION|\[NOT YET DRAFTED/;
+// Section groups for the Choose page. Optional = kept by only one country / US annex.
+const OPTIONAL=new Set(["1.7","2.21","Annex"]);
+function groupOf(s){ if(OPTIONAL.has(s.no)||s.tier===0) return "optional"; if(s.tier===3) return "local"; return "core"; }
+function locked(s){ return groupOf(s)!=="optional"; } // core + local are always in
 // National organization per country — used by the dashboard and AI drafting.
 const ORG={Albania:"JetaPlus",Bulgaria:"True Horizons",Estonia:"Koma","Czech Republic":"KAM",
  Latvia:"Jauniešu Virzība",Poland:"Fala",Romania:"Vital",Serbia:"Omladinski Pokret Mreža",
@@ -254,8 +269,11 @@ const LANG={Albania:{code:"sq",name:"Albanian",endo:"Shqip"},Bulgaria:{code:"bg"
 let country=COUNTRIES[3], state={}, filter="all", lang="en";
 // Preselect a country when opened from the landing page (/build?country=Poland).
 try{const qp=new URLSearchParams(location.search).get("country");if(qp&&COUNTRIES.includes(qp))country=qp;}catch(e){}
-function st(){ if(!state[country]){state[country]={};
-  ORDER.forEach(s=>state[country][s.no]={on:s.tier!==0,txt:s.text,loc:""});} return state[country]; }
+function st(){
+  if(!state[country])state[country]={};
+  const c=state[country];
+  ORDER.forEach(s=>{ if(!c[s.no])c[s.no]={on:groupOf(s)!=="optional",txt:s.text,loc:""}; if(locked(s))c[s.no].on=true; });
+  return c; }
 function langName(){const L=LANG[country];return L?L.name:"the local language";}
 function langEndo(){const L=LANG[country];return L?L.endo:country;}
 // Each country's own name in its own language (used in native-language headers/PDF).
@@ -376,18 +394,18 @@ function tiles(){
 }
 function drawPick(){
  const c=st();
- document.getElementById("groups").innerHTML=CHAPS.map(ch=>{
-  const it=ORDER.filter(s=>s.chap===ch);
-  const n=it.filter(s=>c[s.no].on).length;
-  return `<div class="grp"><div class="gh"><div class="gt">${esc(chapName(ch))}</div>
-   <div class="bar" style="margin:0"><span class="gt">${n}/${it.length}</span>
-   <button class="btn" data-ch="${ch}" data-v="1">${esc(T("all"))}</button>
-   <button class="btn" data-ch="${ch}" data-v="0">${esc(T("none"))}</button></div></div>`+
-   it.map(s=>{const cc=clsCode(s.tier);const on=c[s.no].on;
-    return `<label class="it ${cc}${on?" sel":" off"}"><input type="checkbox" data-no="${esc(s.no)}"${on?" checked":""}>
-     <span class="ino">${esc(s.no)}</span><span class="itt">${esc(titleOf(s))}</span>
-     <span class="badge ${cc}">${esc(clsName(s.tier))}</span></label>`;}).join("")+`</div>`;
- }).join("");
+ const g={core:[],local:[],optional:[]};
+ ORDER.forEach(s=>g[groupOf(s)].push(s));
+ const row=s=>{const cc=clsCode(s.tier),on=c[s.no].on,lk=locked(s);
+  return `<label class="it ${cc}${on?" sel":" off"}${lk?" lk":""}"><input type="checkbox" data-no="${esc(s.no)}"${on?" checked":""}${lk?" disabled":""}>
+    <span class="ino">${esc(s.no)}</span><span class="itt">${esc(titleOf(s))}</span>
+    <span class="badge ${cc}">${esc(clsName(s.tier))}</span></label>`;};
+ const onCount=a=>a.filter(s=>c[s.no].on).length;
+ document.getElementById("groups").innerHTML=
+  `<details class="grp coreblk" open><summary class="gh"><span class="gt">✓ Core — every handbook includes these</span><span class="gt">${g.core.length} · locked in</span></summary>${g.core.map(row).join("")}</details>
+   <div class="grp"><div class="gh"><div class="gt">✍ Your organization writes these</div><span class="gt">${g.local.length} · locked in</span></div>
+    <div class="ghint">You develop these for your country. In <b>Build handbook</b>, use <b>✨ Draft with AI</b> to get a starting point you can edit.</div>${g.local.map(row).join("")}</div>
+   <div class="grp"><div class="gh"><div class="gt">＋ Optional — turn on what fits your country</div><span class="gt">${onCount(g.optional)}/${g.optional.length} on</span></div>${g.optional.map(row).join("")}</div>`;
 }
 function drawBuild(){
  const c=st();
@@ -540,13 +558,15 @@ document.getElementById("brandcol").addEventListener("input",e=>{bd().color=e.ta
 document.getElementById("pdf").onclick=makePDF;
 document.getElementById("groups").addEventListener("change",e=>{
  const cb=e.target.closest("[data-no]");if(!cb)return;
+ const s=SEC.find(x=>x.no===cb.dataset.no);
+ if(s&&locked(s)){cb.checked=true;return;} // core + local are locked in
  st()[cb.dataset.no].on=cb.checked;draw();});
 document.getElementById("groups").addEventListener("click",e=>{
  const b=e.target.closest("[data-ch]");if(!b)return;
  ORDER.filter(s=>s.chap===b.dataset.ch).forEach(s=>st()[s.no].on=b.dataset.v==="1");draw();});
 document.querySelectorAll("[data-a]").forEach(b=>b.onclick=()=>{
- const a=b.dataset.a;
- ORDER.forEach(s=>st()[s.no].on = a==="all"?true : a==="none"?false : s.tier!==0);draw();});
+ const on=b.dataset.a==="all";
+ ORDER.forEach(s=>{ if(groupOf(s)==="optional") st()[s.no].on=on; });draw();});
 document.querySelectorAll("[data-f]").forEach(b=>b.onclick=()=>{filter=b.dataset.f;drawBuild();});
 document.getElementById("build").addEventListener("input",e=>{
  const t=e.target.closest("[data-t]");if(!t)return;
