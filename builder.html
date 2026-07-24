@@ -68,6 +68,13 @@ textarea:focus{outline:2px solid var(--focus);outline-offset:-1px}
 .coreblk>summary{cursor:pointer;list-style:none}
 .coreblk>summary::-webkit-details-marker{display:none}
 .ghint{padding:9px 16px;font-size:12.5px;color:#7A5410;background:var(--flag);border-bottom:1px solid var(--rule);line-height:1.5}
+.pickblk>summary{cursor:pointer;list-style:none}
+.pickblk>summary::-webkit-details-marker{display:none}
+.cx{margin-left:auto;border-color:transparent;color:var(--soft);font-size:11px;padding:4px 9px}
+.cx:hover{border-color:var(--u);color:var(--u)}
+.needs{margin-top:9px;background:#F7E9EC;border:1px solid #E3B7C0;border-left:3px solid var(--u);border-radius:0 var(--r) var(--r) 0;padding:9px 12px;font-size:12.5px;color:#6E1D2B;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.needs-h{font-weight:600;margin-right:2px}
+.needs code{font-family:'IBM Plex Mono',monospace;font-size:11px;background:#fff;border:1px solid #E3B7C0;border-radius:3px;padding:2px 6px;color:#6E1D2B}
 .hide{display:none}
 .foot{margin-top:30px;padding-top:15px;border-top:1px solid var(--rule);font-size:12.5px;color:var(--soft);line-height:1.6;max-width:76ch}
 .foot code{font-family:'IBM Plex Mono',monospace;font-size:11.5px;background:var(--s2);padding:1px 5px;border-radius:2px}
@@ -186,8 +193,14 @@ const CHNAME={"0":"Your Organization","1":"Chapter 1 — Overview","2":"Chapter 
 const MARK=/\[LOCAL|\[NEW SECTION|\[NOT YET DRAFTED/;
 // Section groups for the Choose page. Optional = kept by only one country / US annex.
 const OPTIONAL=new Set(["1.7","2.21","Annex"]);
-function groupOf(s){ if(OPTIONAL.has(s.no)||s.tier===0) return "optional"; if(s.tier===3) return "local"; return "core"; }
-function locked(s){ return groupOf(s)!=="optional"; } // core + local are always in
+// Recommendation tiers — nothing is locked yet; countries can toggle anything.
+function groupOf(s){
+ if(s.tier===3) return "local";
+ if(OPTIONAL.has(s.no)||s.tier===0) return "optional";
+ if(s.tier===1) return "core";
+ return "recommended";
+}
+function defaultOn(s){ return groupOf(s)!=="optional"; }
 // National organization per country — used by the dashboard and AI drafting.
 const ORG={Albania:"JetaPlus",Bulgaria:"True Horizons",Estonia:"Koma","Czech Republic":"KAM",
  Latvia:"Jauniešu Virzība",Poland:"Fala",Romania:"Vital",Serbia:"Omladinski Pokret Mreža",
@@ -272,7 +285,7 @@ try{const qp=new URLSearchParams(location.search).get("country");if(qp&&COUNTRIE
 function st(){
   if(!state[country])state[country]={};
   const c=state[country];
-  ORDER.forEach(s=>{ if(!c[s.no])c[s.no]={on:groupOf(s)!=="optional",txt:s.text,loc:""}; if(locked(s))c[s.no].on=true; });
+  ORDER.forEach(s=>{ if(!c[s.no])c[s.no]={on:defaultOn(s),txt:s.text,loc:""}; });
   return c; }
 function langName(){const L=LANG[country];return L?L.name:"the local language";}
 function langEndo(){const L=LANG[country];return L?L.endo:country;}
@@ -391,21 +404,23 @@ function tiles(){
  document.getElementById("tiles2").innerHTML=r(b);
  document.getElementById("c1").textContent=`${k.on}/${ORDER.length}`;
  document.getElementById("c2").textContent=`${k.todo} ${en?T("toWrite"):T("toTranslate")}`;
+ const ft=document.getElementById("fTodo");if(ft)ft.textContent=(en?T("stillToWrite"):T("stillToTranslate"))+" · "+k.todo;
 }
 function drawPick(){
  const c=st();
- const g={core:[],local:[],optional:[]};
+ const g={local:[],core:[],recommended:[],optional:[]};
  ORDER.forEach(s=>g[groupOf(s)].push(s));
- const row=s=>{const cc=clsCode(s.tier),on=c[s.no].on,lk=locked(s);
-  return `<label class="it ${cc}${on?" sel":" off"}${lk?" lk":""}"><input type="checkbox" data-no="${esc(s.no)}"${on?" checked":""}${lk?" disabled":""}>
+ const row=s=>{const cc=clsCode(s.tier),on=c[s.no].on;
+  return `<label class="it ${cc}${on?" sel":" off"}"><input type="checkbox" data-no="${esc(s.no)}"${on?" checked":""}>
     <span class="ino">${esc(s.no)}</span><span class="itt">${esc(titleOf(s))}</span>
     <span class="badge ${cc}">${esc(clsName(s.tier))}</span></label>`;};
- const onCount=a=>a.filter(s=>c[s.no].on).length;
+ const onC=a=>a.filter(s=>c[s.no].on).length;
+ const block=(open,icon,head,desc,arr)=>`<details class="grp pickblk"${open?" open":""}><summary class="gh"><span class="gt">${icon} ${esc(head)}</span><span class="gt">${onC(arr)}/${arr.length}</span></summary><div class="ghint">${desc}</div>${arr.map(row).join("")}</details>`;
  document.getElementById("groups").innerHTML=
-  `<div class="grp"><div class="gh"><div class="gt">✍ Your organization writes these — start here</div><span class="gt">${g.local.length} · locked in</span></div>
-    <div class="ghint">Your handbook's own story and local details — your name and history, mission, leadership, holidays, salary, and more. In <b>Build handbook</b>, use <b>✨ Draft with AI</b> to get a starting point you can edit.</div>${g.local.map(row).join("")}</div>
-   <details class="grp coreblk"><summary class="gh"><span class="gt">✓ Core — same in every JV handbook</span><span class="gt">${g.core.length} · locked in · click to view</span></summary>${g.core.map(row).join("")}</details>
-   <div class="grp"><div class="gh"><div class="gt">＋ Optional — turn on what fits your country</div><span class="gt">${onCount(g.optional)}/${g.optional.length} on</span></div>${g.optional.map(row).join("")}</div>`;
+  block(true,"✍","Your organization writes these — start here","Your handbook's own story and local details — name and history, mission, leadership, holidays, salary. In <b>Build handbook</b>, use <b>✨ Draft with AI</b> for a starting point.",g.local)+
+  block(true,"✓","Core — should be in every handbook","These are the core things that should carry across every JV handbook. They're pre-selected — but uncheck any that truly don't fit your country.",g.core)+
+  block(false,"◆","Worth thinking about","JV sets the wording and you fill in the local specifics. Consider each one for your country.",g.recommended)+
+  block(false,"＋","Also consider","Add these if they fit your country.",g.optional);
 }
 function drawBuild(){
  const c=st();
@@ -428,9 +443,13 @@ function drawBuild(){
    :`<button class="btn" data-cp="${esc(s.no)}">${esc(T("copyEnglish"))}</button>`;
   const aiLabel=en?T("draftAI"):T("translateAI");
   const ph=en?"":` placeholder="${esc(T("writePlaceholder"))}"`;
+   const val=en?r.txt:(r.loc||"");
+   const blanks=val.match(/\[[^\]]*\]/g)||[];
+   const needs=blanks.length?`<div class="needs"><span class="needs-h">Needs your input — fill these in:</span>${blanks.map(b=>`<code>${esc(b)}</code>`).join("")}</div>`:"";
   return `<div class="card ${cc}"><div class="ch"><span class="cn">${esc(s.no)}</span>
-   <span class="ct">${esc(titleOf(s))}</span><span class="badge ${cc}">${esc(clsName(s.tier))}</span></div>
-   <div class="cbody"><textarea data-t="${esc(s.no)}" aria-label="${esc(s.no)}"${ph}>${esc(en?r.txt:(r.loc||""))}</textarea>
+   <span class="ct">${esc(titleOf(s))}</span><span class="badge ${cc}">${esc(clsName(s.tier))}</span><button class="btn cx" data-off="${esc(s.no)}" title="Remove this section from the handbook">✕ Remove</button></div>
+   <div class="cbody"><textarea data-t="${esc(s.no)}" aria-label="${esc(s.no)}"${ph}>${esc(val)}</textarea>
+    ${needs}
    <div class="crow"><span class="state"><i class="dot ${state[0]}"></i>${esc(state[1])}</span>
    ${actions}
    <button class="btn ai" data-ai="${esc(s.no)}">${esc(aiLabel)}</button></div>
@@ -558,9 +577,10 @@ document.getElementById("brandcol").addEventListener("input",e=>{bd().color=e.ta
 document.getElementById("pdf").onclick=makePDF;
 document.getElementById("groups").addEventListener("change",e=>{
  const cb=e.target.closest("[data-no]");if(!cb)return;
- const s=SEC.find(x=>x.no===cb.dataset.no);
- if(s&&locked(s)){cb.checked=true;return;} // core + local are locked in
- st()[cb.dataset.no].on=cb.checked;draw();});
+ st()[cb.dataset.no].on=cb.checked;
+ const it=cb.closest(".it");if(it){it.classList.toggle("sel",cb.checked);it.classList.toggle("off",!cb.checked);}
+ const det=cb.closest(".pickblk");if(det){const tot=det.querySelectorAll(".it").length,on=det.querySelectorAll(".it input:checked").length,cnt=det.querySelector("summary .gt:last-child");if(cnt)cnt.textContent=on+"/"+tot;}
+ tiles();dashboard();persist();});
 document.getElementById("groups").addEventListener("click",e=>{
  const b=e.target.closest("[data-ch]");if(!b)return;
  ORDER.filter(s=>s.chap===b.dataset.ch).forEach(s=>st()[s.no].on=b.dataset.v==="1");draw();});
@@ -574,6 +594,8 @@ document.getElementById("build").addEventListener("input",e=>{
 document.getElementById("build").addEventListener("click",e=>{
  const ai=e.target.closest("[data-ai]");
  if(ai){aiDraft(ai.dataset.ai);return;}
+ const off=e.target.closest("[data-off]");
+ if(off){st()[off.dataset.off].on=false;draw();return;}
  const cp=e.target.closest("[data-cp]");
  if(cp){const r=st()[cp.dataset.cp];r.loc=r.txt;draw();scheduleAutosave();return;}
  const b=e.target.closest("[data-r]");if(!b)return;
