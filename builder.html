@@ -402,9 +402,9 @@ function drawPick(){
     <span class="badge ${cc}">${esc(clsName(s.tier))}</span></label>`;};
  const onCount=a=>a.filter(s=>c[s.no].on).length;
  document.getElementById("groups").innerHTML=
-  `<details class="grp coreblk" open><summary class="gh"><span class="gt">✓ Core — every handbook includes these</span><span class="gt">${g.core.length} · locked in</span></summary>${g.core.map(row).join("")}</details>
-   <div class="grp"><div class="gh"><div class="gt">✍ Your organization writes these</div><span class="gt">${g.local.length} · locked in</span></div>
-    <div class="ghint">You develop these for your country. In <b>Build handbook</b>, use <b>✨ Draft with AI</b> to get a starting point you can edit.</div>${g.local.map(row).join("")}</div>
+  `<div class="grp"><div class="gh"><div class="gt">✍ Your organization writes these — start here</div><span class="gt">${g.local.length} · locked in</span></div>
+    <div class="ghint">Your handbook's own story and local details — your name and history, mission, leadership, holidays, salary, and more. In <b>Build handbook</b>, use <b>✨ Draft with AI</b> to get a starting point you can edit.</div>${g.local.map(row).join("")}</div>
+   <details class="grp coreblk"><summary class="gh"><span class="gt">✓ Core — same in every JV handbook</span><span class="gt">${g.core.length} · locked in · click to view</span></summary>${g.core.map(row).join("")}</details>
    <div class="grp"><div class="gh"><div class="gt">＋ Optional — turn on what fits your country</div><span class="gt">${onCount(g.optional)}/${g.optional.length} on</span></div>${g.optional.map(row).join("")}</div>`;
 }
 function drawBuild(){
